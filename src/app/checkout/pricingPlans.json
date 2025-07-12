@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Basic",
+    "price": 29,
+    "originalPrice": 58,
+    "headshots": 10,
+    "time": 3,
+    "isPopular": false
+  },
+  {
+    "name": "Professional",
+    "price": 39,
+    "originalPrice": 78,
+    "headshots": 100,
+    "time": 2,
+    "isPopular": true
+  },
+  {
+    "name": "Executive",
+    "price": 59,
+    "originalPrice": 118,
+    "headshots": 200,
+    "time": 1,
+    "isPopular": false
+  }
+]
+
