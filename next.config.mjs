@@ -1,6 +1,5 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
-  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -19,9 +18,6 @@ const nextConfig = {
         pathname: "/**",
       },
     ],
-  },
-  env: {
-    NEXT_PUBLIC_BASE_URL: "https://3000-ionwsctjk3fobdw66s42l-93ed546b.manusvm.computer",
   },
 };
 
