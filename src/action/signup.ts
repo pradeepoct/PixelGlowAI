@@ -6,16 +6,28 @@ import { AuthError } from "@supabase/supabase-js";
 import { sendEmail } from "./sendEmail";
 
 async function sendWelcomeEmail(email: string) {
-  return await sendEmail({
-    to: email,
-    from: process.env.NOREPLY_EMAIL || 'noreply@pixelglowai.app',
-    templateId: 'welcome',
-  });
+  try {
+    return await sendEmail({
+      to: email,
+      from: process.env.NOREPLY_EMAIL || 'noreply@pixelglowai.app',
+      templateId: 'welcome',
+    });
+  } catch (error) {
+    console.error('Failed to send welcome email:', error);
+    // Don't fail signup if email fails
+    return { success: false, error: 'Email service unavailable' };
+  }
 }
 
 export async function signUp(formData: FormData): Promise<never> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+
+  // Validate environment variables
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return redirect(`/signup?message=${encodeURIComponent("Service configuration error. Please try again later.")}`);
+  }
+
   const supabase = createClient();
 
   const { data: signUpData, error } = await supabase.auth.signUp({
@@ -49,7 +61,7 @@ export async function signUp(formData: FormData): Promise<never> {
     console.error("Error updating userTable:", updateError);
   }
 
-  // Send welcome email
+  // Send welcome email (non-blocking)
   await sendWelcomeEmail(email);
 
   return redirect("/forms?signupCompleted");
