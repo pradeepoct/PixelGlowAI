@@ -21,30 +21,48 @@ async function sendWelcomeEmailAsync(email: string) {
 }
 
 export async function signUp(formData: FormData): Promise<never> {
+  console.log('🚀 Starting signup process...');
+  
   try {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
+    console.log('📧 Email:', email ? 'provided' : 'missing');
+    console.log('🔐 Password:', password ? 'provided' : 'missing');
+
     // Validate input
     if (!email || !password) {
+      console.error('❌ Missing email or password');
       return redirect(`/signup?message=${encodeURIComponent("Email and password are required.")}`);
     }
 
     // Validate environment variables
+    console.log('🔍 Checking environment variables...');
+    console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'MISSING');
+    console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'MISSING');
+    
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('Missing Supabase environment variables');
+      console.error('❌ Missing Supabase environment variables');
       return redirect(`/signup?message=${encodeURIComponent("Service configuration error. Please try again later.")}`);
     }
 
+    console.log('🔗 Creating Supabase client...');
     const supabase = createClient();
 
+    console.log('📝 Attempting Supabase signup...');
     const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
-      console.error('Supabase signup error:', error);
+      console.error('❌ Supabase signup error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
+      
       let errorMessage = "An error occurred during signup.";
       if (error instanceof AuthError) {
         switch (error.status) {
@@ -62,10 +80,14 @@ export async function signUp(formData: FormData): Promise<never> {
     }
 
     if (!signUpData.user) {
+      console.error('❌ No user data returned from signup');
       return redirect(`/signup?message=${encodeURIComponent("Signup failed. Please try again.")}`);
     }
 
+    console.log('✅ User created successfully:', signUpData.user.id);
+
     // Try to update userTable, but don't fail signup if this fails
+    console.log('💾 Updating userTable...');
     try {
       const { error: updateError } = await supabase
         .from("userTable")
@@ -73,22 +95,27 @@ export async function signUp(formData: FormData): Promise<never> {
         .select();
 
       if (updateError) {
-        console.error("Error updating userTable:", updateError);
+        console.error("⚠️ Error updating userTable:", updateError);
         // Continue with signup even if userTable update fails
+      } else {
+        console.log('✅ UserTable updated successfully');
       }
     } catch (updateError) {
-      console.error("Error updating userTable:", updateError);
+      console.error("⚠️ Exception updating userTable:", updateError);
       // Continue with signup even if userTable update fails
     }
 
     // Send welcome email in background (don't await to avoid blocking)
+    console.log('📨 Sending welcome email...');
     sendWelcomeEmailAsync(email).catch(err => {
       console.error('Background email error:', err);
     });
 
+    console.log('🎉 Signup completed! Redirecting to /forms?signupCompleted');
     return redirect("/forms?signupCompleted");
   } catch (error) {
-    console.error('Unexpected error in signup:', error);
+    console.error('💥 Unexpected error in signup:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return redirect(`/signup?message=${encodeURIComponent("An unexpected error occurred. Please try again.")}`);
   }
 } 
