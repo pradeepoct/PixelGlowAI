@@ -9,11 +9,13 @@ paypal.configure({
 
 export async function POST(request: NextRequest) {
   try {
-    const { planType, amount } = await request.json();
+    const { planType, amount, promoCode, originalAmount } = await request.json();
 
     console.log('Received request to create PayPal order:');
     console.log('Plan Type:', planType);
     console.log('Amount:', amount);
+    console.log('Promo Code:', promoCode);
+    console.log('Original Amount:', originalAmount);
 
     if (!planType || !amount) {
       console.error('Missing required fields: planType, amount');
@@ -21,6 +23,17 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: planType, amount' },
         { status: 400 }
       );
+    }
+
+    // Build item description based on whether promo code was applied
+    let itemDescription = `${planType} plan`;
+    let transactionDescription = `Payment for ${planType} plan`;
+    
+    if (promoCode && originalAmount && originalAmount > amount) {
+      const discount = originalAmount - amount;
+      const discountPercentage = Math.round((discount / originalAmount) * 100);
+      itemDescription += ` (${discountPercentage}% off with ${promoCode})`;
+      transactionDescription += ` with ${promoCode} discount (${discountPercentage}% off)`;
     }
 
     const create_payment_json = {
@@ -37,8 +50,8 @@ export async function POST(request: NextRequest) {
           item_list: {
             items: [
               {
-                name: planType,
-                sku: planType,
+                name: itemDescription,
+                sku: `${planType}${promoCode ? '_' + promoCode : ''}`,
                 price: amount.toFixed(2),
                 currency: 'USD',
                 quantity: 1,
@@ -49,7 +62,15 @@ export async function POST(request: NextRequest) {
             currency: 'USD',
             total: amount.toFixed(2),
           },
-          description: `Payment for ${planType} plan`,
+          description: transactionDescription,
+          // Add custom data for tracking
+          custom: JSON.stringify({
+            planType,
+            promoCode: promoCode || null,
+            originalAmount: originalAmount || amount,
+            finalAmount: amount,
+            discountApplied: promoCode && originalAmount ? originalAmount - amount : 0
+          }),
         },
       ],
     };

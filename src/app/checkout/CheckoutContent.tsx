@@ -13,6 +13,12 @@ interface PricingPlan {
   features: string[];
 }
 
+interface PromoCode {
+  code: string;
+  discount: number; // percentage
+  description: string;
+}
+
 const pricingPlans: PricingPlan[] = [
   {
     name: 'Basic',
@@ -41,12 +47,26 @@ const pricingPlans: PricingPlan[] = [
   },
 ];
 
+// Available promotional codes
+const promoCodes: PromoCode[] = [
+  { code: 'SAVE10', discount: 10, description: '10% off your order' },
+  { code: 'WELCOME20', discount: 20, description: '20% off for new customers' },
+  { code: 'PIXEL15', discount: 15, description: '15% off special offer' },
+  { code: 'LAUNCH50', discount: 50, description: '50% off launch special' },
+];
+
 export default function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedPlanName = searchParams.get('plan') || 'basic';
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Promo code states
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   useEffect(() => {
     const plan = pricingPlans.find(
@@ -59,6 +79,53 @@ export default function CheckoutContent() {
       router.push('/');
     }
   }, [selectedPlanName, router]);
+
+  // Calculate discounted price
+  const getDiscountedPrice = () => {
+    if (!selectedPlan || !appliedPromo) return selectedPlan?.price || 0;
+    const discount = (selectedPlan.price * appliedPromo.discount) / 100;
+    return selectedPlan.price - discount;
+  };
+
+  const getFinalPrice = () => {
+    return getDiscountedPrice();
+  };
+
+  // Apply promotional code
+  const applyPromoCode = () => {
+    if (!promoCode.trim()) {
+      setPromoError('Please enter a promotional code');
+      return;
+    }
+
+    setIsApplyingPromo(true);
+    setPromoError('');
+
+    // Simulate API call delay
+    setTimeout(() => {
+      const foundPromo = promoCodes.find(
+        (promo) => promo.code.toLowerCase() === promoCode.toLowerCase()
+      );
+
+      if (foundPromo) {
+        setAppliedPromo(foundPromo);
+        setPromoError('');
+        toast.success(`🎉 Promo code applied! ${foundPromo.discount}% off`);
+      } else {
+        setPromoError('Invalid promotional code');
+        setAppliedPromo(null);
+      }
+      setIsApplyingPromo(false);
+    }, 500);
+  };
+
+  // Remove promotional code
+  const removePromoCode = () => {
+    setAppliedPromo(null);
+    setPromoCode('');
+    setPromoError('');
+    toast.info('Promotional code removed');
+  };
 
   if (!selectedPlan) {
     return (
@@ -82,6 +149,7 @@ export default function CheckoutContent() {
     console.log("Actions passed to createOrder:", actions);
 
     try {
+      const finalAmount = getFinalPrice();
       const response = await fetch("/api/paypal/create-order", {
         method: "POST",
         headers: {
@@ -89,7 +157,9 @@ export default function CheckoutContent() {
         },
         body: JSON.stringify({
           planType: selectedPlan.name,
-          amount: selectedPlan.price,
+          amount: finalAmount, // Use discounted price
+          promoCode: appliedPromo?.code || null,
+          originalAmount: selectedPlan.price,
         }),
       });
 
@@ -185,9 +255,77 @@ export default function CheckoutContent() {
              ))}
           </div>
 
-          <div className="text-gray-800">
+          <div className="text-gray-800 border-t pt-4">
             <p className="text-sm line-through text-gray-500">Original Price: ${selectedPlan.price * 2}.00</p>
-            <p className="text-2xl font-bold">Total: ${selectedPlan.price}.00</p>
+            <p className="text-lg font-medium">Price: ${selectedPlan.price}.00</p>
+            
+            {/* Promotional Code Section */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Promotional Code</h3>
+              
+              {!appliedPromo ? (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="Enter promo code"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={isApplyingPromo}
+                    />
+                    <button
+                      onClick={applyPromoCode}
+                      disabled={isApplyingPromo || !promoCode.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {isApplyingPromo ? 'Applying...' : 'Apply'}
+                    </button>
+                  </div>
+                  {promoError && (
+                    <p className="text-red-500 text-xs">{promoError}</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Try: SAVE10, WELCOME20, PIXEL15, or LAUNCH50
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-md p-3">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">
+                      🎉 {appliedPromo.code} Applied!
+                    </p>
+                    <p className="text-xs text-green-600">{appliedPromo.description}</p>
+                  </div>
+                  <button
+                    onClick={removePromoCode}
+                    className="text-green-600 hover:text-green-800 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Price Summary */}
+            <div className="mt-4 space-y-2">
+              {appliedPromo && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>${selectedPlan.price}.00</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Discount ({appliedPromo.discount}%):</span>
+                    <span>-${((selectedPlan.price * appliedPromo.discount) / 100).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between text-xl font-bold border-t pt-2">
+                <span>Total:</span>
+                <span>${getFinalPrice().toFixed(2)}</span>
+              </div>
+            </div>
           </div>
         </div>
 
