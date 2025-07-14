@@ -47,12 +47,13 @@ const pricingPlans: PricingPlan[] = [
   },
 ];
 
-// Available promotional codes
+// Available promotional codes - UPDATED
 const promoCodes: PromoCode[] = [
   { code: 'SAVE10', discount: 10, description: '10% off your order' },
   { code: 'WELCOME20', discount: 20, description: '20% off for new customers' },
   { code: 'PIXEL15', discount: 15, description: '15% off special offer' },
   { code: 'LAUNCH50', discount: 50, description: '50% off launch special' },
+  { code: 'NEW2025', discount: 25, description: '25% off New Year special' },
 ];
 
 export default function CheckoutContent() {
@@ -149,44 +150,42 @@ export default function CheckoutContent() {
     console.log("Actions passed to createOrder:", actions);
 
     try {
-      const finalAmount = getFinalPrice();
-      const response = await fetch("/api/paypal/create-order", {
-        method: "POST",
+      const response = await fetch('/api/paypal/create-order', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           planType: selectedPlan.name,
-          amount: finalAmount, // Use discounted price
-          promoCode: appliedPromo?.code || null,
-          originalAmount: selectedPlan.price,
+          amount: getFinalPrice().toFixed(2),
         }),
       });
 
-      const order = await response.json();
-      console.log("PayPal create order API response:", order);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (response.ok && order.approvalUrl && order.id) {
-        setLoading(false);
-        // Instead of returning the order ID, we need to redirect to the approval URL
-        window.location.href = order.approvalUrl;
+      const order = await response.json();
+      console.log("Order created:", order);
+
+      if (order.id) {
         return order.id;
       } else {
-        toast.error(order.error || "Failed to create PayPal order.");
-        setLoading(false);
-        return ""; // Return empty string to prevent PayPal from proceeding
+        throw new Error('Order creation failed: No order ID returned');
       }
     } catch (error) {
-      console.error("Error creating PayPal order:", error);
-      toast.error("Failed to create PayPal order. Please try again.");
+      console.error('Error creating order:', error);
+      toast.error('Failed to create PayPal order. Please try again.');
       setLoading(false);
-      return ""; // Return empty string to prevent PayPal from proceeding
+      throw error;
     }
   };
 
   const onApprove = async (data: any, actions: any) => {
-    setLoading(true);
-    console.log("onApprove function called.", data);
+    console.log("onApprove function called.");
+    console.log("Data passed to onApprove:", data);
+    console.log("Actions passed to onApprove:", actions);
+
     try {
       const response = await fetch('/api/paypal/capture-order', {
         method: 'POST',
@@ -194,24 +193,28 @@ export default function CheckoutContent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          orderID: data.orderID, // PayPal's order ID
-          payerID: data.payerID, // PayPal's Payer ID
+          orderID: data.orderID,
+          payerID: data.payerID,
         }),
       });
 
-      const result = await response.json();
-      console.log("PayPal capture order API response:", result);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (response.ok && result.success) {
-        toast.success('Payment successful!');
-        router.push(`/postcheckout?orderId=${data.orderID}`); // Redirect to success page
+      const result = await response.json();
+      console.log("Capture result:", result);
+
+      if (result.success) {
+        toast.success('Payment successful! Redirecting...');
+        router.push('/postcheckout');
       } else {
-        toast.error(result.error || 'Payment failed. Please try again.');
-        setLoading(false);
+        throw new Error('Payment capture failed');
       }
     } catch (error) {
-      console.error('Error capturing PayPal order:', error);
-      toast.error('Failed to process payment. Please try again.');
+      console.error('Error capturing payment:', error);
+      toast.error('Payment processing failed. Please contact support.');
+    } finally {
       setLoading(false);
     }
   };
@@ -259,9 +262,9 @@ export default function CheckoutContent() {
             <p className="text-sm line-through text-gray-500">Original Price: ${selectedPlan.price * 2}.00</p>
             <p className="text-lg font-medium">Price: ${selectedPlan.price}.00</p>
             
-            {/* Promotional Code Section */}
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Promotional Code</h3>
+            {/* PROMOTIONAL CODE SECTION - ALWAYS VISIBLE */}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-800 mb-3">🎫 Have a Promo Code?</h3>
               
               {!appliedPromo ? (
                 <div className="space-y-3">
@@ -271,35 +274,36 @@ export default function CheckoutContent() {
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                       placeholder="Enter promo code"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-4 py-3 border-2 border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       disabled={isApplyingPromo}
                     />
                     <button
                       onClick={applyPromoCode}
                       disabled={isApplyingPromo || !promoCode.trim()}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                     >
                       {isApplyingPromo ? 'Applying...' : 'Apply'}
                     </button>
                   </div>
                   {promoError && (
-                    <p className="text-red-500 text-xs">{promoError}</p>
+                    <p className="text-red-500 text-sm font-medium">{promoError}</p>
                   )}
-                  <p className="text-xs text-gray-500">
-                    Try: SAVE10, WELCOME20, PIXEL15, or LAUNCH50
-                  </p>
+                  <div className="text-sm text-blue-600 bg-blue-100 p-3 rounded-md">
+                    <p className="font-medium mb-1">💡 Try these codes:</p>
+                    <p>SAVE10, WELCOME20, PIXEL15, LAUNCH50, NEW2025</p>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-md p-3">
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-md p-4">
                   <div>
-                    <p className="text-sm font-medium text-green-800">
+                    <p className="text-lg font-bold text-green-800">
                       🎉 {appliedPromo.code} Applied!
                     </p>
-                    <p className="text-xs text-green-600">{appliedPromo.description}</p>
+                    <p className="text-sm text-green-600">{appliedPromo.description}</p>
                   </div>
                   <button
                     onClick={removePromoCode}
-                    className="text-green-600 hover:text-green-800 text-sm font-medium"
+                    className="text-green-600 hover:text-green-800 text-sm font-medium bg-green-100 px-3 py-1 rounded"
                   >
                     Remove
                   </button>
@@ -307,23 +311,24 @@ export default function CheckoutContent() {
               )}
             </div>
 
-            {/* Price Summary */}
-            <div className="mt-4 space-y-2">
+            {/* PRICE SUMMARY */}
+            <div className="mt-6 space-y-2 bg-gray-50 p-4 rounded-lg">
               {appliedPromo && (
                 <>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-lg">
                     <span>Subtotal:</span>
                     <span>${selectedPlan.price}.00</span>
                   </div>
-                  <div className="flex justify-between text-sm text-green-600">
+                  <div className="flex justify-between text-lg text-green-600 font-medium">
                     <span>Discount ({appliedPromo.discount}%):</span>
                     <span>-${((selectedPlan.price * appliedPromo.discount) / 100).toFixed(2)}</span>
                   </div>
+                  <hr className="border-gray-300" />
                 </>
               )}
-              <div className="flex justify-between text-xl font-bold border-t pt-2">
+              <div className="flex justify-between text-2xl font-bold text-gray-900">
                 <span>Total:</span>
-                <span>${getFinalPrice().toFixed(2)}</span>
+                <span className="text-blue-600">${getFinalPrice().toFixed(2)}</span>
               </div>
             </div>
           </div>
