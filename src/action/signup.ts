@@ -86,6 +86,10 @@ export async function signUp(formData: FormData): Promise<never> {
 
     console.log('✅ User created successfully:', signUpData.user.id);
 
+    // TEMPORARILY SKIP userTable update to isolate the issue
+    console.log('⚠️ Skipping userTable update temporarily for debugging');
+    
+    /*
     // Try to update userTable, but don't fail signup if this fails
     console.log('💾 Updating userTable...');
     try {
@@ -104,18 +108,25 @@ export async function signUp(formData: FormData): Promise<never> {
       console.error("⚠️ Exception updating userTable:", updateError);
       // Continue with signup even if userTable update fails
     }
+    */
 
+    // TEMPORARILY SKIP email sending
+    console.log('⚠️ Skipping email sending temporarily for debugging');
+    /*
     // Send welcome email in background (don't await to avoid blocking)
     console.log('📨 Sending welcome email...');
     sendWelcomeEmailAsync(email).catch(err => {
       console.error('Background email error:', err);
     });
+    */
 
     console.log('🎉 Signup completed! Redirecting to /forms?signupCompleted');
     return redirect("/forms?signupCompleted");
   } catch (error) {
     console.error('💥 Unexpected error in signup:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Error name:', error instanceof Error ? error.name : 'Unknown');
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
     return redirect(`/signup?message=${encodeURIComponent("An unexpected error occurred. Please try again.")}`);
   }
 } 
