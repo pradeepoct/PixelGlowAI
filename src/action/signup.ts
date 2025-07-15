@@ -96,7 +96,7 @@ export async function signUp(formData: FormData): Promise<never> {
       let errorMessage = "An error occurred during signup.";
       
       // Handle specific error types
-      if (error.message.includes('JSON input')) {
+      if (error.message && error.message.includes('JSON input')) {
         console.error('🚨 JSON parsing error detected - likely connectivity or configuration issue');
         errorMessage = "Service connectivity issue. Please try again in a few minutes.";
       } else if (error instanceof AuthError) {
@@ -113,8 +113,10 @@ export async function signUp(formData: FormData): Promise<never> {
           default:
             errorMessage = error.message || "Authentication service error.";
         }
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as any).message || "Unexpected error occurred.";
       } else {
-        errorMessage = error.message || "Unexpected error occurred.";
+        errorMessage = "Authentication service error.";
       }
       
       // Fixed: redirect to signup page (not login)
@@ -165,6 +167,13 @@ export async function signUp(formData: FormData): Promise<never> {
       if (error.message.includes('JSON')) {
         errorMessage = "Service connectivity issue. Please check your internet connection and try again.";
       } else if (error.message.includes('fetch')) {
+        errorMessage = "Network error. Please try again in a few minutes.";
+      }
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      const errorObj = error as any;
+      if (errorObj.message?.includes('JSON')) {
+        errorMessage = "Service connectivity issue. Please check your internet connection and try again.";
+      } else if (errorObj.message?.includes('fetch')) {
         errorMessage = "Network error. Please try again in a few minutes.";
       }
     }
